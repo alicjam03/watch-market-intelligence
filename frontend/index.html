@@ -164,7 +164,7 @@
 
       try {
         // --- MAIN: PRICE POSITION ---
-        const res = await fetch("http://127.0.0.1:8000/price-position", {
+        const res = await fetch("https://watch-market-intelligence.onrender.com/price-position", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ price }),
@@ -184,7 +184,7 @@
         // --- COMPETITOR SNAPSHOT (non-critical, own try/catch) ---
         try {
           const compRes = await fetch(
-            `http://127.0.0.1:8000/competitor-snapshot?price=${price}`
+            `https://watch-market-intelligence.onrender.com/competitor-snapshot?price=${price}`
           );
           if (compRes.ok) {
             const compData = await compRes.json();
@@ -199,7 +199,7 @@
         // --- DESIGN INSIGHTS (non-critical) ---
         try {
           const designRes = await fetch(
-            `http://127.0.0.1:8000/design-insights?min_price=${lower}&max_price=${upper}`
+            `https://watch-market-intelligence.onrender.com/design-insights?min_price=${lower}&max_price=${upper}`
           );
           if (designRes.ok) {
             const designData = await designRes.json();
