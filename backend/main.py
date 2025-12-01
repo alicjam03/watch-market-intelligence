@@ -89,11 +89,17 @@ from fastapi import Query
 
 @app.get("/design-insights")
 def design_insights(
-        price_tier: Optional[int] = Query(None, description="Cluster id 0-3")
+        min_price: float = Query(..., description="Minimum price in USD"),
+        max_price: float = Query(..., description="Maximum price in USD"),
 ):
-    data = df.copy()
-    if price_tier is not None:
-        data = data[data["price_cluster"] == price_tier]
+    # Ensure price is numeric
+    local_df = df.copy()
+    local_df["price_usd"] = pd.to_numeric(local_df["price_usd"], errors="coerce")
+
+    data = local_df[
+        (local_df["price_usd"] >= min_price) &
+        (local_df["price_usd"] <= max_price)
+    ].copy()
 
     total = len(data)
     if total == 0:
@@ -120,7 +126,9 @@ def design_insights(
     }
 
 @app.get("/competitor-snapshot")
-def competitor_snapshot(price:float):
+def competitor_snapshot(
+        price:float,
+):
     X = np.array([[price, np.log10(price)]])
     X_scaled = scaler.transform(X)
     cluster_id = int(kmeans.predict(X_scaled)[0])

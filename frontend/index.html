@@ -34,7 +34,7 @@
       border: 1px solid #ccc;
       font-size: 16px;
       box-sizing: border-box;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
     button {
       padding: 10px 18px;
@@ -44,6 +44,7 @@
       cursor: pointer;
       background: #2563eb;
       color: white;
+      margin-top: 10px;
     }
     button:disabled {
       opacity: 0.5;
@@ -53,20 +54,12 @@
       margin-top: 16px;
       line-height: 1.6;
     }
-    .small {
-      font-size: 13px;
-      color: #555;
-      margin-top: 8px;
-    }
     .error {
       color: #b91c1c;
       margin-top: 10px;
     }
     ul {
       padding-left: 18px;
-    }
-    h2 {
-      margin-top: 0;
     }
   </style>
 </head>
@@ -78,7 +71,7 @@
   <div class="card">
     <form id="price-form">
       <label for="price-input">Enter watch price (USD)</label>
-      <input id="price-input" type="number" min="1" step="1" required />
+      <input id="price-input" type="number" min="1" required />
 
       <button id="submit-btn" type="submit">Analyse</button>
       <div id="error" class="error"></div>
@@ -87,13 +80,25 @@
     <div id="result" class="result" style="display:none;">
       <p><strong>Price tier:</strong> <span id="tier"></span></p>
       <p><strong>Market percentile:</strong> <span id="percentile"></span>% of watches are cheaper.</p>
-      <p><strong>Suggestion:</strong> <span id="recommendation"></span></p>
+      <p><strong>Recommendation:</strong> <span id="recommendation"></span></p>
     </div>
+  </div>
+
+  <!-- COMPETITOR SNAPSHOT -->
+  <div id="competitor-card" class="card" style="display:none;">
+    <h2>Competitor Snapshot</h2>
+
+    <p><strong>Main brands in this tier:</strong></p>
+    <ul id="brands-tier"></ul>
+
+    <p><strong>Main brands near your price:</strong></p>
+    <ul id="brands-near"></ul>
   </div>
 
   <!-- DESIGN INSIGHTS -->
   <div id="design-card" class="card" style="display:none;">
-    <h2>Design Trends at This Price Tier</h2>
+    <h2>Design Trends Near This Price (±20%)</h2>
+
     <p><strong>Most common case materials:</strong></p>
     <ul id="case-materials"></ul>
 
@@ -108,17 +113,6 @@
     </p>
   </div>
 
-  <!-- COMPETITOR SNAPSHOT -->
-  <div id="competitor-card" class="card" style="display:none;">
-    <h2>Competitor Snapshot</h2>
-
-    <p><strong>Main brands in this tier:</strong></p>
-    <ul id="brands-tier"></ul>
-
-    <p><strong>Main brands near your price:</strong></p>
-    <ul id="brands-near"></ul>
-  </div>
-
   <script>
     const form = document.getElementById("price-form");
     const priceInput = document.getElementById("price-input");
@@ -129,19 +123,19 @@
     const errorBox = document.getElementById("error");
     const submitBtn = document.getElementById("submit-btn");
 
+    const competitorCard = document.getElementById("competitor-card");
+    const brandsTierList = document.getElementById("brands-tier");
+    const brandsNearList = document.getElementById("brands-near");
+
     const designCard = document.getElementById("design-card");
     const caseList = document.getElementById("case-materials");
     const strapList = document.getElementById("strap-materials");
     const dialList = document.getElementById("dial-colours");
     const diameterSpan = document.getElementById("diameter-stats");
 
-    const competitorCard = document.getElementById("competitor-card");
-    const brandsTierList = document.getElementById("brands-tier");
-    const brandsNearList = document.getElementById("brands-near");
-
     function fillList(element, data) {
       element.innerHTML = "";
-      for (const [key, value] of Object.entries(data)) {
+      for (const [key, value] of Object.entries(data || {})) {
         const li = document.createElement("li");
         li.textContent = `${key} (${value})`;
         element.appendChild(li);
@@ -152,12 +146,16 @@
       e.preventDefault();
       errorBox.textContent = "";
       resultBox.style.display = "none";
-      designCard.style.display = "none";
       competitorCard.style.display = "none";
+      designCard.style.display = "none";
 
       const price = Number(priceInput.value);
+      const band = 0.2;
+      const lower = price * (1 - band);
+      const upper = price * (1 + band);
+
       if (!price || price <= 0) {
-        errorBox.textContent = "Please enter a positive price.";
+        errorBox.textContent = "Please enter a valid price.";
         return;
       }
 
@@ -165,14 +163,16 @@
       submitBtn.textContent = "Analysing...";
 
       try {
-        // --- PRICE POSITION ---
+        // --- MAIN: PRICE POSITION ---
         const res = await fetch("http://127.0.0.1:8000/price-position", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ price }),
         });
 
-        if (!res.ok) throw new Error("Server error");
+        if (!res.ok) {
+          throw new Error("Server error: " + res.status);
+        }
 
         const data = await res.json();
 
@@ -181,32 +181,48 @@
         recSpan.textContent = data.recommendation;
         resultBox.style.display = "block";
 
-        // --- COMPETITOR SNAPSHOT ---
-        const compRes = await fetch(
-          `http://127.0.0.1:8000/competitor-snapshot?price=${price}`
-        );
-        const compData = await compRes.json();
+        // --- COMPETITOR SNAPSHOT (non-critical, own try/catch) ---
+        try {
+          const compRes = await fetch(
+            `http://127.0.0.1:8000/competitor-snapshot?price=${price}`
+          );
+          if (compRes.ok) {
+            const compData = await compRes.json();
+            fillList(brandsTierList, compData.top_brands_in_tier);
+            fillList(brandsNearList, compData.top_brands_near_price);
+            competitorCard.style.display = "block";
+          }
+        } catch (e) {
+          console.warn("Competitor snapshot failed:", e);
+        }
 
-        fillList(brandsTierList, compData.top_brands_in_tier);
-        fillList(brandsNearList, compData.top_brands_near_price);
-        competitorCard.style.display = "block";
+        // --- DESIGN INSIGHTS (non-critical) ---
+        try {
+          const designRes = await fetch(
+            `http://127.0.0.1:8000/design-insights?min_price=${lower}&max_price=${upper}`
+          );
+          if (designRes.ok) {
+            const designData = await designRes.json();
 
-        const tierId = compData.cluster_id;
+            fillList(caseList, designData.top_case_materials);
+            fillList(strapList, designData.top_strap_materials);
+            fillList(dialList, designData.top_dial_colours);
 
-        // --- DESIGN INSIGHTS ---
-        const designRes = await fetch(
-          `http://127.0.0.1:8000/design-insights?price_tier=${tierId}`
-        );
-        const designData = await designRes.json();
+            const d = designData.case_diameter_stats || {};
+            if (d.min != null && d.max != null && d.mean != null) {
+              diameterSpan.textContent =
+                `Min: ${d.min.toFixed ? d.min.toFixed(1) : d.min}, ` +
+                `Max: ${d.max.toFixed ? d.max.toFixed(1) : d.max}, ` +
+                `Mean: ${d.mean.toFixed ? d.mean.toFixed(1) : d.mean}`;
+            } else {
+              diameterSpan.textContent = "Not enough data.";
+            }
+            designCard.style.display = "block";
+          }
+        }  catch (e) {
+         console.warn("Design insights failed:", e);
+        }
 
-        fillList(caseList, designData.top_case_materials);
-        fillList(strapList, designData.top_strap_materials);
-        fillList(dialList, designData.top_dial_colours);
-
-        const d = designData.case_diameter_stats;
-        diameterSpan.textContent = `Min: ${d.min}, Max: ${d.max}, Mean: ${d.mean.toFixed(1)}`;
-
-        designCard.style.display = "block";
 
       } catch (err) {
         console.error(err);
@@ -219,3 +235,4 @@
   </script>
 </body>
 </html>
+
