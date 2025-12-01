@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Data (keep big raw/processed files out of the repo)
+data/raw/
+data/processed/
+
+# Other
+*.log
