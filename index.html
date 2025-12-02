@@ -165,7 +165,7 @@
 
       try {
         // --- MAIN: PRICE POSITION ---
-        const res = await fetch('${API_BASE}/price-position', {
+        const res = await fetch(`${API_BASE}/price-position`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ price }),
@@ -227,7 +227,7 @@
 
       } catch (err) {
         console.error(err);
-        errorBox.textContent = "Could not contact API. Is it running on :8000?";
+        errorBox.textContent = "Could not contact API. Please check the server URL.";
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = "Analyse";
