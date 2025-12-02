@@ -11,6 +11,7 @@ app = FastAPI(title="Watch Market Intelligence API")
 origins = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
+    "https://alicjam03.github.io",
 ]
 
 app.add_middleware(
